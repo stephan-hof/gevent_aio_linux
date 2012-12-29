@@ -1,0 +1,48 @@
+Some results of benchmarking io_submit,io_getevents of linux kernel v.3.7.0
+
+write perf (test_file_write.py)
+                    direct_append, direct_inplace, buffered_append, buffered_inplace
+ext2-syscalltime     19.6            1.3            2.3               2.3
+ext2-realtim         21.2           21.0            2.1               2.1
+
+ext3-syscalltime     20.5            1.3            2.1               2.1
+ext3-realtim         22.0           20.6            2.4               3.1
+
+ext4-syscalltime     20.7            1.5            2.1               2.1
+ext4-realtim         22.2           21.1            2.4               3.0
+
+xfs-syscalltime      18.8            1.2            2.4               2.3
+xfs-realtim          20.3           15.4            2.7               2.7
+
+btrfs-syscalltime    18.2            2.0            2.0               2.1
+btrfs-realtim        19.6           15.5            2.5               2.5
+
+three files in parallel
+For each file 10240 io_submit calls each having 4096 bytes => 40 meg/file
+
+running 'fio' with hammer_disk.cfg in the background the 'sysclalltime' for
+'direct-io' keeps constant. For 'buffered' it goes up.
+
+I increased the the size per io_submit and oh wonder oh wonder O_DIRECT runs way
+faster. => Userspace needs to buffer the data and then submiting a big block of
+data sequenzially to disk (what is done by the kernel in fact)
+
+
+read perf (test_file_read.py)
+
+three files in parallel. Files were allocalted by
+dd if=/dev/zero of=foo bs=1024 count=602400
+
+Before the buffered read the following was done
+#To free pagecache:
+echo 1 > /proc/sys/vm/drop_caches
+#To free dentries and inodes:
+echo 2 > /proc/sys/vm/drop_caches
+#To free pagecache, dentries and inodes:
+echo 3 > /proc/sys/vm/drop_caches
+
+For each file do 580 io_submit calls each requesting 1Meg => 580 meg/file.
+
+                    direct_read,        buffered_read
+xfs-syscalltime        3.9                  81.5
+xfs-realtime          75.2                  82.5
